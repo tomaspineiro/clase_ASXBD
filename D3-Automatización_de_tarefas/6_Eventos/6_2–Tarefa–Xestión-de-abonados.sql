@@ -39,27 +39,103 @@ LOAD DATA LOCAL INFILE '/home/usuario/clase_ASXBD/BasesDeDatos/usuarios.csv' INT
 
 -- Resolucion del ejercio 
 
-
 DROP EVENT IF EXISTS cuotaMes;
 
 CREATE  EVENT IF NOT EXISTS cuotaMes 
-    ON SCHEDULE 
-        EVERY  1 MONTH
+    ON SCHEDULE AT 1 MONTH
+    DO CALL cobroCuota();
+
+DELIMITER //
+CREATE OR REPLACE PROCEDURE cobroCuota()
+BEGIN
+
+    DECLARE vFinal integer DEFAULT 0;
+    DECLARE idCliente INT;
+    DECLARE saldoActual INT;
+    DECLARE tipoCliente INT;
+
+    DECLARE tipo1 INT;
+    DECLARE tipo2 INT;
+    DECLARE tipo3 INT;
+
+    DECLARE restarSaldo CURSOR FOR SELECT id, saldo, tipo FROM usuarios;
+    DECLARE CONTINUE handler FOR NOT found SET vFinal = 1;
+
+    SET tipo1 = 50;
+    SET tipo2 = 100;
+    SET tipo2 = 200;
+
+    -- inicio del cursor
+
+    OPEN restarSaldo;
+    
+    WHILE vFinal = 0 DO  
+        FETCH restarSaldo INTO idCliente, saldoActual, tipoCliente;
+        IF vFinal = 0 THEN 
+            CASE 
+            WHEN tipoCliente = 1 THEN 
+                UPDATE usuario SET saldo = saldoActual- tipo1 WHERE id=idCliente;      
+            WHEN tipoCliente = 2 THEN
+                UPDATE usuario SET saldo = saldoActual - tipo2 WHERE id=idCliente;           
+            WHEN tipoCliente = 3 THEN
+                UPDATE usuario SET saldo = saldoActual - tipo3 WHERE id=idCliente;           
+            END CASE;
+        END IF;    
+    END WHILE;    
+
+    CLOSE restarSaldo; -- fin del cursor 
+
+END // -- fin del procediminto.
+DELIMITER ;
+
+CREATE OR REPLACE TABLE messaldoNegativo (
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    idUsuario INT,
+    fecha DATETIME DEFAULT CURRENT_TIMESTAMP(),
+    saldoActual INT
+);
+
+DELIMITER //
+DROP TRIGGER IF EXISTS saldoNegativo //
+CREATE TRIGGER saldoNegativo AFTER UPDATE ON usuarios  FOR EACH ROW 
+BEGIN
+    
+    IF NEW.saldo < 0 THEN 
+    
+        INSERT INTO  messaldoNegativo (saldoActual, idUsuario ) VALUES (NEW.saldo, id);
+    
+    END IF;
+
+END //
+DELIMITER ;
+
+CREATE OR REPLACE TABLE borrados  (
+    id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    idUsuario INT,
+    Usuario VARCHAR(200),
+    Email VARCHAR(200),
+    Teléfono VARCHAR(9),
+    Saldo INT,
+    Tipo INT,
+    data DATETIME DEFAULT CURRENT_TIMESTAMP()
+);
+
+DELIMITER //
+DROP TRIGGER IF EXISTS impagos3 //
+CREATE TRIGGER impagos3 AFTER INSERT ON messaldoNegativo  FOR EACH ROW 
+BEGIN
+    
+    DECLARE contador INT;
+    
+    SET contador = (SELECT COUNT(*) FROM messaldoNegativo WHERE idUsuario=NEW.idUsuario);
+    
+    IF contador >= 3 THEN 
         
-    DO 
-    ;
-
-
-
-CREATE PROCEDURE cobroCuota()
-
-
-
-
-
-
-
-
+        INSERT INTO  borrados (idUsuario, Usuario, Email, Teléfono, Saldo, Tipo) SELECT ID, Usuario, Email, Teléfono, Saldo, Tipo FROM usuarios WHERE  id=idUsuario;
+    
+    END IF;
+END //
+DELIMITER ;
 
 
 
